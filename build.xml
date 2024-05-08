@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="AntBuilder" basedir=".">
+    <property file="build.properties"/>
+
+    <path id="project.classpath">
+        <fileset dir="${lib.dir}">
+            <include name="**/*.jar"/>
+        </fileset>
+        <pathelement path="${build.dir}"/>
+    </path>
+
+    <taskdef uri="antlib:org.jacoco.ant" resource="org/jacoco/ant/antlib.xml">
+        <classpath>
+            <fileset dir="${lib.dir}" includes="org.jacoco.ant-0.8.8.jar"/>
+            <fileset dir="${lib.dir}" includes="org.jacoco.core-0.8.8.jar"/>
+            <fileset dir="${lib.dir}" includes="org.jacoco.report-0.8.8.jar"/>
+            <fileset dir="${lib.dir}" includes="org.jacoco.agent-0.8.8.jar"/>
+        </classpath>
+    </taskdef>
+
+    <target name="init">
+        <mkdir dir="${build.dir}"/>
+        <mkdir dir="${dist.dir}"/>
+        <mkdir dir="${test.results.dir}"/>
+    </target>
+
+    <target name="compile" depends="init">
+        <javac srcdir="${src.dir}" destdir="${build.dir}" includeantruntime="false">
+            <classpath refid="project.classpath"/>
+        </javac>
+    </target>
+
+    <target name="build" depends="compile">
+        <war destfile="${dist.dir}/AntBuilder-${version}.war" webxml="${webapp.dir}/WEB-INF/web.xml">
+            <fileset dir="${webapp.dir}" excludes="WEB-INF/**"/>
+            <lib dir="${lib.dir}">
+                <exclude name="${war.excludes}"/>
+            </lib>
+            <classes dir="${build.dir}"/>
+            <webinf dir="${webapp.dir}/WEB-INF">
+                <include name="${file.pattern.xml}"/>
+                <include name="${file.pattern.xhtml}"/>
+                <include name="${file.pattern.js}"/>
+                <include name="${file.pattern.css}"/>
+            </webinf>
+            <fileset dir="src/main/resources" includes="${file.pattern.persistence}"/>
+        </war>
+        <javac srcdir="${test.src.dir}" destdir="${build.dir}/test" includeantruntime="false">
+            <classpath>
+                <path refid="project.classpath"/>
+                <pathelement path="${build.dir}"/>
+            </classpath>
+        </javac>
+    </target>
+
+    <target name="clean">
+        <delete dir="${build.dir}"/>
+        <delete dir="${dist.dir}"/>
+    </target>
+
+    <target name="test" depends="build">
+
+        <coverage destfile="${build.dir}/jacoco.exec">
+            <junit printsummary="yes" haltonfailure="yes" showoutput="true" fork="true">
+                <classpath>
+                    <path refid="project.classpath"/>
+                    <pathelement path="${build.dir}/test"/>
+                </classpath>
+                <formatter type="plain" usefile="false"/>
+                <batchtest fork="yes" todir="${test.results.dir}">
+                    <fileset dir="${build.dir}/test" includes="**/*Tests.class"/>
+                </batchtest>
+            </junit>
+        </coverage>
+
+        <report>
+            <executiondata>
+                <file file="${build.dir}/jacoco.exec"/>
+            </executiondata>
+            <structure name="JaCoCo Report">
+                <classfiles>
+                    <fileset dir="${build.dir}" includes="aca98b/web3lv2/*.class"/>
+                </classfiles>
+                <sourcefiles encoding="UTF-8">
+                    <fileset dir="${src.dir}" includes="aca98b/web3lv2/*.java"/>
+                </sourcefiles>
+            </structure>
+            <html destdir="${build.dir}/jacoco-report"/>
+        </report>
+
+        <condition property="coverage.ok">
+            <and>
+                <available file="${build.dir}/jacoco.exec"/>
+                <coverage threshold="0.5">
+                    <classfiles>
+                        <fileset dir="${build.dir}" includes="aca98b/web3lv2/*.class"/>
+                    </classfiles>
+                    <sourcefiles encoding="UTF-8">
+                        <fileset dir="${src.dir}" includes="aca98b/web3lv2/*.java"/>
+                    </sourcefiles>
+                </coverage>
+            </and>
+        </condition>
+
+        <fail message="Coverage is less than 50%" unless="coverage.ok"/>
+
+        <echo message="Tests completed. See ${build.dir}/jacoco-report for coverage report."/>
+
+        <condition property="open.browser">
+            <not><equals arg1="${coverage.ok}" arg2="true"/></not>
+        </condition>
+
+        <exec executable="open" if="open.browser">
+            <arg value="https://www.google.com/search?q=%D1%8D%D1%8D%D1%8D+%D0%BA%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C+%D1%82%D0%B5%D1%81%D1%82%D1%8B+%D0%B4%D0%BB%D1%8F+%D0%B4%D0%B6%D0%B0%D0%B2%D0%B0+%D1%8D%D1%8D%D1%8D%D1%8D%D1%8D%D1%8D&amp;sourceid=chrome&amp;ie=UTF-8"/>
+        </exec>
+
+    </target>
+
+
+    <target name="xml" depends="init">
+        <apply executable="xmllint" failonerror="true">
+            <fileset dir="." includes="**/*.xml" />
+        </apply>
+    </target>
+
+
+    <target name="alt" depends="init">
+        <replace dir="${src.dir}" includes="**/*.java">
+            <replacefilter token="oldName" value="newName"/>
+        </replace>
+        <replace dir="${test.src.dir}" includes="**/*.java">
+            <replacefilter token="oldName" value="newName"/>
+        </replace>
+        <jar destfile="${dist.dir}/AntBuilder-${version}-alt.jar" basedir="${build.dir}">
+            <manifest>
+                <attribute name="Main-Class" value="newName"/>
+                <attribute name="Implementation-Version" value="${version}"/>
+            </manifest>
+        </jar>
+    </target>
+</project>
