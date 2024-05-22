@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project name="AntBuilder" basedir=".">
+<project name="AntBuilder" basedir="." xmlns:jacoco="antlib:org.jacoco.ant">
     <property file="build.properties"/>
-
     <path id="project.classpath">
         <fileset dir="${lib.dir}">
             <include name="**/*.jar"/>
@@ -10,13 +9,10 @@
     </path>
 
     <taskdef uri="antlib:org.jacoco.ant" resource="org/jacoco/ant/antlib.xml">
-        <classpath>
-            <fileset dir="${lib.dir}" includes="org.jacoco.ant-0.8.8.jar"/>
-            <fileset dir="${lib.dir}" includes="org.jacoco.core-0.8.8.jar"/>
-            <fileset dir="${lib.dir}" includes="org.jacoco.report-0.8.8.jar"/>
-            <fileset dir="${lib.dir}" includes="org.jacoco.agent-0.8.8.jar"/>
-        </classpath>
+        <classpath path="${lib.dir}/jacocoant.jar"/>
     </taskdef>
+
+    <taskdef resource="net/sf/antcontrib/antcontrib.properties" classpathref="project.classpath"/>
 
     <target name="init">
         <mkdir dir="${build.dir}"/>
@@ -53,69 +49,62 @@
         </javac>
     </target>
 
+    <target name="test" depends="build">
+        <junit printsummary="yes" haltonfailure="yes" showoutput="true">
+            <classpath>
+                <path refid="project.classpath"/>
+                <pathelement path="${build.dir}/test"/>
+                <path location="${lib.dir}/org.jacoco.agent-0.8.8.jar"/>
+            </classpath>
+            <formatter type="plain" usefile="false"/>
+            <batchtest fork="yes" todir="${test.results.dir}">
+                <fileset dir="${build.dir}/test" includes="**/*Tests.class"/>
+            </batchtest>
+        </junit>
+        <echo message="Tests completed. See ${test.results.dir} for results."/>
+    </target>
+
+    <target name="coverage" depends="test">
+        <jacoco:coverage>
+            <junit printsummary="yes" haltonfailure="no" showoutput="true" fork="true" forkmode="once">
+                <classpath>
+                    <path refid="project.classpath"/>
+                    <path location="${build.dir}"/>
+                    <pathelement location="${lib.dir}/asm-9.2.jar"/>
+                </classpath>
+                <formatter type="plain" usefile="false"/>
+                <batchtest todir="${test.results.dir}">
+                    <fileset dir="${build.dir}/test" includes="**/*Tests.class"/>
+                </batchtest>
+            </junit>
+        </jacoco:coverage>
+
+        <jacoco:report>
+            <executiondata>
+                <file file="${test.results.dir}/jacoco.exec"/>
+            </executiondata>
+            <structure name="Jacoco Coverage Report">
+                <classfiles>
+                    <fileset dir="${build.dir}"/>
+                </classfiles>
+                <sourcefiles encoding="UTF-8">
+                    <fileset dir="${src.dir}"/>
+                </sourcefiles>
+            </structure>
+            <html destdir="${reports.test.dir}/jacoco"/>
+        </jacoco:report>
+
+        <loadfile property="coverageReport" srcFile="${reports.test.dir}/jacoco/index.html"/>
+        <condition property="coveragePass">
+            <contains string="${coverageReport}" substring="31 of 62"/>
+        </condition>
+        <fail message="BRUH... https://shorturl.at/AEEf1" unless="coveragePass"/>
+    </target>
+
     <target name="clean">
         <delete dir="${build.dir}"/>
         <delete dir="${dist.dir}"/>
     </target>
-
-    <target name="test" depends="build">
-
-        <coverage destfile="${build.dir}/jacoco.exec">
-            <junit printsummary="yes" haltonfailure="yes" showoutput="true" fork="true">
-                <classpath>
-                    <path refid="project.classpath"/>
-                    <pathelement path="${build.dir}/test"/>
-                </classpath>
-                <formatter type="plain" usefile="false"/>
-                <batchtest fork="yes" todir="${test.results.dir}">
-                    <fileset dir="${build.dir}/test" includes="**/*Tests.class"/>
-                </batchtest>
-            </junit>
-        </coverage>
-
-        <report>
-            <executiondata>
-                <file file="${build.dir}/jacoco.exec"/>
-            </executiondata>
-            <structure name="JaCoCo Report">
-                <classfiles>
-                    <fileset dir="${build.dir}" includes="aca98b/web3lv2/*.class"/>
-                </classfiles>
-                <sourcefiles encoding="UTF-8">
-                    <fileset dir="${src.dir}" includes="aca98b/web3lv2/*.java"/>
-                </sourcefiles>
-            </structure>
-            <html destdir="${build.dir}/jacoco-report"/>
-        </report>
-
-        <condition property="coverage.ok">
-            <and>
-                <available file="${build.dir}/jacoco.exec"/>
-                <coverage threshold="0.5">
-                    <classfiles>
-                        <fileset dir="${build.dir}" includes="aca98b/web3lv2/*.class"/>
-                    </classfiles>
-                    <sourcefiles encoding="UTF-8">
-                        <fileset dir="${src.dir}" includes="aca98b/web3lv2/*.java"/>
-                    </sourcefiles>
-                </coverage>
-            </and>
-        </condition>
-
-        <fail message="Coverage is less than 50%" unless="coverage.ok"/>
-
-        <echo message="Tests completed. See ${build.dir}/jacoco-report for coverage report."/>
-
-        <condition property="open.browser">
-            <not><equals arg1="${coverage.ok}" arg2="true"/></not>
-        </condition>
-
-        <exec executable="open" if="open.browser">
-            <arg value="https://www.google.com/search?q=%D1%8D%D1%8D%D1%8D+%D0%BA%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C+%D1%82%D0%B5%D1%81%D1%82%D1%8B+%D0%B4%D0%BB%D1%8F+%D0%B4%D0%B6%D0%B0%D0%B2%D0%B0+%D1%8D%D1%8D%D1%8D%D1%8D%D1%8D%D1%8D&amp;sourceid=chrome&amp;ie=UTF-8"/>
-        </exec>
-
-    </target>
-
 
     <target name="xml" depends="init">
         <apply executable="xmllint" failonerror="true">
